@@ -44,23 +44,28 @@ class CsvUploadView(FormView):
             for record in csv_reader:
                 try:
                     location_type, status = LocationType.objects.get_or_create(
-                            name='RiverPointObservation',
+                            name='PointObservation',
                             allowed_geometry='POINT'
                     )
 
                     record_point = Point(
-                            float(record['Longitude']),
-                            float(record['Latitude']))
+                            float(record['Long']),
+                            float(record['Lat']))
+
+                    if 'location_name' in record:
+                        location_name = record['location_name']
+                    else:
+                        location_name = 'No Location Name'
 
                     location_site, status = LocationSite.objects.get_or_create(
                         location_type=location_type,
                         geometry_point=record_point,
-                        name=record['River'],
+                        name=location_name,
                     )
 
                     # Get existed taxon
                     collections = ReptileCollectionRecord.objects.filter(
-                            original_species_name=record['Species']
+                            original_species_name=record['Taxon']
                     )
 
                     taxon_gbif = None
@@ -70,19 +75,17 @@ class CsvUploadView(FormView):
                     collection, collection_status = ReptileCollectionRecord.\
                         objects.get_or_create(
                             site=location_site,
-                            original_species_name=record['Species'],
-                            category=record['Category'].lower(),
-                            present=record['Present'] == 1,
-                            absent=record['Absent'] == 1,
-                            collection_date=datetime(
-                                    int(record['Year']), 1, 1),
-                            collector=record['Collector'],
-                            notes=record['Notes'],
+                            original_species_name=record['Taxon'],
+                            present=True,
+                            collection_date=datetime.strptime(
+                                    record['date'], '%d %b %Y'),
+                            collector=record['Observer'],
+                            notes=record['notes'],
                             taxon_gbif_id=taxon_gbif,
                         )
                     if collection_status:
                         reptile_processed['added'] += 1
-                except ValueError:
+                except (ValueError, KeyError):
                     reptile_processed['failed'] += 1
 
         self.context_data['uploaded'] = 'Reptile added ' + \
