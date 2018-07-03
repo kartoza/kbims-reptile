@@ -19,7 +19,7 @@ from django.conf.urls.static import static
 
 urlpatterns = [
     url(r'^admin/', admin.site.urls),
-    url(r'^grappelli/', include('grappelli.urls')),
+    url(r'^grappelli/', include('grappelli.urls'), name='link_list'),
     url(r'^', include('reptile.urls')),
     url(r'^api-auth/', include('rest_framework.urls')),
 ]
