@@ -38,9 +38,14 @@ class CsvUploadView(FormView):
 
     def form_valid(self, form):
         form.save(commit=True)
-        reptile_processed = {
+        collection_processed = {
             'added': 0,
             'failed': 0
+        }
+
+        optional_fields = {
+            'present': 'bool',
+            'absent': 'bool'
         }
 
         # Read csv
@@ -55,29 +60,28 @@ class CsvUploadView(FormView):
             collection_post_save_update_cluster,
         )
 
+        location_sites = []
         with open(csv_file.path, 'r') as csvfile:
             csv_reader = csv.DictReader(csvfile)
             for record in csv_reader:
                 try:
+                    print('------------------------------------')
+                    print('Processing : %s' % record['species_name'])
                     location_type, status = LocationType.objects.get_or_create(
-                            name='PointObservation',
-                            allowed_geometry='POINT'
+                        name='PointObservation',
+                        allowed_geometry='POINT'
                     )
 
                     record_point = Point(
-                            float(record['Long']),
-                            float(record['Lat']))
-
-                    if 'location_name' in record:
-                        location_name = record['location_name']
-                    else:
-                        location_name = 'No Location Name'
+                        float(record['longitude']),
+                        float(record['latitude']))
 
                     location_site, status = LocationSite.objects.get_or_create(
                         location_type=location_type,
                         geometry_point=record_point,
-                        name=location_name,
+                        name=record['location_site'],
                     )
+                    location_sites.append(location_site)
 
                     # Get existed taxon
                     collections = ReptileCollectionRecord.objects.filter(
@@ -88,24 +92,40 @@ class CsvUploadView(FormView):
                     if collections:
                         taxon_gbif = collections[0].taxon_gbif_id
 
-                    collection, collection_status = ReptileCollectionRecord.\
-                        objects.get_or_create(
+                    # Optional fields and value
+                    optional_records = {}
+
+                    for (opt_field, field_type) in optional_fields.iteritems():
+                        if opt_field in record:
+                            if field_type == 'bool':
+                                record[opt_field] = record[opt_field] == '1'
+                            optional_records[opt_field] = record[opt_field]
+
+                    collection_records, status = ReptileCollectionRecord.\
+                        objects.\
+                        get_or_create(
                             site=location_site,
-                            original_species_name=record['Taxon'],
-                            present=True,
+                            original_species_name=record['species_name'],
+                            category=record['category'].lower(),
                             collection_date=datetime.strptime(
-                                    record['date'], '%d %b %Y'),
-                            collector=record['Observer'],
+                                    record['date'], '%Y-%m-%d'),
+                            collector=record['collector'],
                             notes=record['notes'],
                             taxon_gbif_id=taxon_gbif,
+                            owner=self.request.user,
+                            **optional_records
                         )
-                    if collection_status:
-                        reptile_processed['added'] += 1
-                except (ValueError, KeyError):
-                    reptile_processed['failed'] += 1
 
-        self.context_data['uploaded'] = 'Reptile added ' + \
-                                        str(reptile_processed['added'])
+                    if not status:
+                        print('%s Added' % record['species_name'])
+                        collection_processed['added'] += 1
+
+                except (ValueError, KeyError):
+                    collection_processed['failed'] += 1
+                print('------------------------------------')
+
+        self.context_data['uploaded'] = 'Collection added ' + \
+                                        str(collection_processed['added'])
 
         # reconnect post save handler of location sites
         models.signals.post_save.connect(
