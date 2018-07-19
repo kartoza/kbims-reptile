@@ -27,7 +27,4 @@ api_urls = [
         name='reptile-process_shapefiles'),
 ]
 
-urlpatterns = [
-# Add custom URL paths here 
-
-] + api_urls
+urlpatterns = api_urls

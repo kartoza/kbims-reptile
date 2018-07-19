@@ -13,8 +13,11 @@ class ReptileCollectionList(APIView):
     """
 
     def get(self, request, *args):
-        reptile_collections = ReptileCollectionRecord.objects.filter(absent=True)
-        serializer = ReptileCollectionSerializer(reptile_collections, many=True)
+        reptile_collections = ReptileCollectionRecord.objects.filter(
+                absent=True)
+        serializer = ReptileCollectionSerializer(
+                reptile_collections,
+                many=True)
         return Response(serializer.data)
 
 
